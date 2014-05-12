@@ -74,13 +74,24 @@
 
 (defun time-to-run-job (job)
   "checks if it is time to run the current job based on the current time"
-  (multiple-value-bind (usec umin uhour udom umonth udow)
+  (multiple-value-bind (usec umin uhour udom umonth uyear udow)
       (decode-universal-time (get-universal-time))
     (declare (ignore usec))
     (and (member umin (job-minute job))
 	 (member uhour (job-hour job))
-	 (or (member udom (job-dom job))
-	     (member udow (job-dow job)))
+	 (cond
+	   ((and (= (length (job-dom job)) 31)
+		  (= (length (job-dow job)) 7))
+	    t)
+	   ((and (= (length (job-dom job)) 31)
+		 (not (= (length (job-dow job)) 7)))
+	    (member udow (job-dow job)))	   
+	   ((and (not (= (length (job-dom job)) 31))
+		 (= (length (job-dow job)) 7))
+	    (member udom (job-dom job)))
+	   (t
+	    (or (member udom (job-dom job))
+		(member udow (job-dow job)))))
 	 (member umonth (job-month job))
 	 (not (job-@boot job)))))
 
