@@ -18,6 +18,9 @@
 
 (asdf:defsystem #:cl-cron
   :version "0.1"
+  :author "Mackram G Raydan"
+  :license "GPL"
+  :description "A simple tool that provides cron like facilities directly inside of common lisp. For this to work properly note that your lisp implementation should have support for threads"
   :serial t
   :depends-on (:bordeaux-threads)
   :components ((:file "packages")
