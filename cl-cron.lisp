@@ -122,7 +122,8 @@
 	 (if *cron-load-file*
 	     (load *cron-load-file* :verbose nil :print nil :if-does-not-exist nil))
 	 (maphash #'run-job-if-boot *cron-jobs-hash*)
-	 (setf *cron-dispatcher-thread* (bordeaux-threads:make-thread #'cron-dispatcher)))))
+	 (setf *cron-dispatcher-thread* (bordeaux-threads:make-thread #'cron-dispatcher
+                                                                      :name "cl-cron")))))
 
 (defun restart-cron()
   "function that starts up cron but without loading the file or running any of the boot only cron jobs in the list"

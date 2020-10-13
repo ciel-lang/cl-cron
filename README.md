@@ -22,10 +22,14 @@ Print a message every minute.
 
 Wait a minute to see output.
 
-Stop it with `stop-cron`.
+Stop all jobs with `stop-cron`.
 
 ## API
 
 http://quickdocs.org/cl-cron/api
+
+## Changelog
+
+- 2020-10-13: we added a name to the cl-cron thread.
 
 Licence: GPL
