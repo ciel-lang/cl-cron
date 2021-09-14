@@ -37,13 +37,13 @@
    (function-symbol :accessor job-func :initarg :job-func)))
 
 
-(defparameter *cron-jobs-hash* (make-hash-table) 
+(defvar *cron-jobs-hash* (make-hash-table)
   "contains a hash of all corn-job objects that need to be run")
 
-(defparameter *cron-dispatcher-thread* nil
+(defvar *cron-dispatcher-thread* nil
   "a parameter to that holds the cron-dispatcher thread")
 
-(defparameter *cron-dispatcher-processing* (bordeaux-threads:make-lock)
+(defvar *cron-dispatcher-processing* (bordeaux-threads:make-lock)
   "allows us to not kill the thread unless the lock can be acquired")
 
 (defparameter *cron-load-file* nil
@@ -95,24 +95,38 @@
 	 (member umonth (job-month job))
 	 (not (job-@boot job)))))
 
+
+(defun current-time-as-str ()
+  (multiple-value-bind (second minute hour day month year)
+      (decode-universal-time (get-universal-time))
+    (format nil "~A-~2,,,'0@A-~2,,,'0@A ~2,,,'0@A:~2,,,'0@A:~2,,,'0@A"
+            year month day hour minute second)))
+
+
 (defun run-job-if-time (key job)
   "runs the cron-job object in a separate thread if it is its time"
-  (if (time-to-run-job job)
-      (bordeaux-threads:make-thread (job-func job))))
+  (when (time-to-run-job job)
+    (bordeaux-threads:make-thread (job-func job)
+                                  :name (format nil "Cron ~S (started at ~A)"
+                                                key
+                                                (current-time-as-str)))))
 
 (defun run-job-if-boot (key job)
   "runs the cron-job object in a separate thread if it is a boot job"
-  (if (job-@boot job)
-      (bordeaux-threads:make-thread (job-func job))))
+  (when (job-@boot job)
+    (bordeaux-threads:make-thread (job-func job)
+                                  :name (format nil "Cron ~S (started at ~A)"
+                                                key
+                                                (current-time-as-str)))))
 
 (defun cron-dispatcher ()
   "function that dispatches the jobs that are ready to be run"
   (do ()
       (nil nil)
     (sleep (time-until-full-minute (get-universal-time)))
-    (bordeaux-threads:acquire-lock *cron-dispatcher-processing*)
-    (maphash #'run-job-if-time *cron-jobs-hash*)
-    (bordeaux-threads:release-lock *cron-dispatcher-processing*)))
+    (bordeaux-threads:with-lock-held (*cron-dispatcher-processing*)
+      (maphash #'run-job-if-time *cron-jobs-hash*))))
+
 
 (defun start-cron ()
   "function that starts cron by first loading the cron file defined in the variable, then it runs any cron-job that has the job-only-at-boot property set to t. Finally, it starts a thread that runs cron-dispatcher"
@@ -127,19 +141,20 @@
 
 (defun restart-cron()
   "function that starts up cron but without loading the file or running any of the boot only cron jobs in the list"
-  (if (not *cron-dispatcher-thread*)
-      (setf *cron-dispatcher-thread* (bordeaux-threads:make-thread #'cron-dispatcher))
+  (if (or (null *cron-dispatcher-thread*)
+          (not (bt:thread-alive-p *cron-dispatcher-thread*)))
+      (setf *cron-dispatcher-thread* (bordeaux-threads:make-thread #'cron-dispatcher
+                                                                   :name "cl-cron"))
       (log-cron-message "You attempted to call restart-cron while cron is already loaded and running...")))
 
 (defun stop-cron ()
   "allows the stoppage of cron through the killing of the cron-dispatcher. Note that cron-dispatcher is killed only if it is sleeping otherwise we wait till the cron jobs finish. To reuse cron after calling stop-cron, you would need to recall start-cron which would go through all the steps as if cron has just booted. If you wish to prevent these actions when you restart cron then please you restart-cron."
-  (bordeaux-threads:acquire-lock *cron-dispatcher-processing*)
-  (cond (*cron-dispatcher-thread*
-	 (bordeaux-threads:destroy-thread *cron-dispatcher-thread*)
-	 (setf *cron-dispatcher-thread* nil))
-	(t
-	 (log-cron-message "You attempted to call stop-cron while cron is already stopped...")))
-  (bordeaux-threads:release-lock *cron-dispatcher-processing*))
+  (bordeaux-threads:with-lock-held (*cron-dispatcher-processing*)
+    (cond (*cron-dispatcher-thread*
+	   (bordeaux-threads:destroy-thread *cron-dispatcher-thread*)
+	   (setf *cron-dispatcher-thread* nil))
+	  (t
+	   (log-cron-message "You attempted to call stop-cron while cron is already stopped...")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;Utilities for cron that are needed;;;;;;;
@@ -218,9 +233,4 @@
   "Simply log the message sent with type as well"
   (if *cron-log-file*
       (with-open-file (out *cron-log-file* :direction :output :if-exists :append :if-does-not-exist :create)
-	(format out "[~A] ~A ~1%" type message))))
-			
-
-
-
-  
+        (format out "[~A] ~A ~1%" type message))))
