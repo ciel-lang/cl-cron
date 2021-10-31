@@ -8,7 +8,7 @@ Install with Quicklisp:
 
     (ql:quickload "cl-cron")
 
-Note: Quicklisp does not point to this repository.
+Note: Quicklisp points to this repository since the release of October, 2021.
 
 Example:
 
