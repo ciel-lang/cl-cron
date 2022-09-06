@@ -38,7 +38,7 @@
 
 
 (defvar *cron-jobs-hash* (make-hash-table)
-  "contains a hash of all corn-job objects that need to be run")
+  "contains a hash of all cron-job objects that need to be run")
 
 (defvar *cron-dispatcher-thread* nil
   "a parameter to that holds the cron-dispatcher thread")
